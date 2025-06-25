@@ -51,7 +51,7 @@ wget https://ollama.com/download/OllamaSetup.exe
 ollama pull llama3
 
 # 日本語対応モデル（任意で切替）
-ollama pull gemma3:4b
+ollama pull gemma:2b
 ```
 
 ### 1-4. モデル動作確認（CLIによる検証）
@@ -59,13 +59,13 @@ ollama pull gemma3:4b
 モデルが正しく動作するかをCLIで確認：
 
 ```bash
-ollama run gemma3:4b
+ollama run gemma:2b
 ```
 
 プロンプトが表示されたら、日本語で入力してみる：
 
 ```bash
-C:\Users\kura>ollama run gemma3:4b
+C:\Users\kura>ollama run gemma:2b
 >>> Send a message (/? for help)
 ```
 
@@ -88,6 +88,7 @@ Dockerは、アプリケーションを軽量なコンテナ（仮想環境）�
 
 ```yaml
 version: '3.8'
+
 services:
   openwebui:
     image: ghcr.io/open-webui/open-webui:main
