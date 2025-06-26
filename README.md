@@ -1,177 +1,199 @@
-# OpenWebUI + Ollama による日本語Web検索付き生成AIチャット構築手順
+# OpenWebUI + Ollama による日本語対応生成AIチャット構築レクチャー
 
-## 🧩 構成概要
-
-本プロジェクトでは、Qiita記事「OpenWebUI + OllamaによるローカルLLM実行環境構築」を参考に、以下を目標として環境を一から構築する。
-
-### 🎯 目的
-
-* ローカルLLM（例：LLaMA3, Nekomata）を用いた日本語対応生成AIチャットの実装
-* Web検索機能を組み込んだRAG風チャット体験の実現
-
-### 🏗 使用技術スタック
-
-| 項目       | 内容                                   |
-| -------- | ------------------------------------ |
-| チャットUI   | OpenWebUI（Docker）                    |
-| LLMエンジン  | Ollama（ローカル推論）                       |
-| 日本語対応モデル | llama3, nekomata, nous-hermes2-jp など |
-| Web検索連携  | 外部検索APIまたはLangChainツール               |
-| OS想定     | Windows 10/11 or Linux（WSL対応）        |
+本資料は、Dockerを活用してローカル環境に日本語対応の生成AIチャットを構築するためのレクチャー資料です。以下のステップで段階的に構築を行います。
 
 ---
 
-## ✅ ステップ1：OpenWebUI + Ollama の環境構築
+## 📘 第一段階：前提知識とOllama体験
 
-### 1-1. Ollamaとは？
+### ✅ Dockerの基礎
 
-Ollamaはローカル環境で大規模言語モデル（LLM）を手軽に実行できる軽量な実行エンジンです。
+* **Dockerとは**：アプリケーションをコンテナとして仮想化し、どこでも同じ環境で動作させる技術。
 
-* GPU・CPU両対応（GPUがあれば高速）
-* モデルを `ollama pull モデル名` で取得して実行可能
-* CLIやREST APIで操作可能
+### ✅ Ollamaの基礎
 
-公式サイト：[https://ollama.com](https://ollama.com)
+* **Ollamaとは**：ローカルでLLMを実行できる軽量な推論基盤
+* **インストール**：[https://ollama.com](https://ollama.com)
+* **使い方**：
 
-### 1-2. Ollamaのインストール
+  * モデルの取得：
+    ```bash
+    ollama pull gemma:2b
+    ```
+  * 実行：
+    ```bash
+    ollama run gemma:2b
+    ```
+* **CLI実行での挙動確認**：モデルのロード、チャットへの応答、エラーへの対処（例：メモリ不足）
 
-```bash
-# Mac/Linux
-curl -fsSL https://ollama.com/install.sh | sh
 
-# Windows（WSL推奨）
-wget https://ollama.com/download/OllamaSetup.exe
-# または公式から手動ダウンロード：https://ollama.com/download
-```
+<div style="page-break-after: always;"></div>
 
-### 1-3. モデルの取得（日本語モデル）
+## 🚀 第二段階：OpenWebUIをバックエンドOllama接続で起動
 
-```bash
-# llama3 モデルの取得（初回）
-ollama pull llama3
+### ✅ 手順概要
 
-# 日本語対応モデル（任意で切替）
-ollama pull gemma:2b
-```
+1. まず `ollama` をローカルで起動しておく。
+2. `docker-compose.yml` でOpenWebUIコンテナを構築。
+3. `OLLAMA_BASE_URL=http://host.docker.internal:11434` を設定。
+4. ブラウザで `http://localhost:3000` にアクセスし、OpenWebUI の画面を確認。
 
-### 1-4. モデル動作確認（CLIによる検証）
-
-モデルが正しく動作するかをCLIで確認：
-
-```bash
-ollama run gemma:2b
-```
-
-プロンプトが表示されたら、日本語で入力してみる：
+### ✅ docker-compose.yml（バックエンド分離型）
 
 ```bash
-C:\Users\kura>ollama run gemma:2b
->>> Send a message (/? for help)
-```
+version: '3.8' 
+services: 
+  openwebui: 
+    image: ghcr.io/open-webui/open-webui:main 
+    container_name: openwebui 
+    ports: 
+      - "3000:8080" 
+    volumes: 
+      - openwebui-data:/app/backend/data 
+    environment: 
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434 
+    restart: unless-stopped 
 
-問題なく応答が返ってくれば、モデルは正常に動作しています。
-Ctrl + d（または /bye または /exit）で終了。
-
-### 1-5. Dockerとは？
-
-Dockerは、アプリケーションを軽量なコンテナ（仮想環境）として実行するためのプラットフォームです。
-
-#### ✅ 特徴：
-
-* OSやライブラリ依存を気にせず、どこでも同じ動作を保証
-* `Dockerfile` や `docker-compose.yml` で環境構成を定義可能
-* ローカルでもクラウドでも同一の実行環境を再現可能
-
-### 1-6. docker-compose によるOpenWebUIのコンテナ定義と起動
-
-以下の内容で `docker-compose.yml` ファイルを作成します：
-
-```yaml
-version: '3.8'
-
-services:
-  openwebui:
-    image: ghcr.io/open-webui/open-webui:main
-    container_name: openwebui
-    ports:
-      - "3000:8080"
-    volumes:
-      - openwebui-data:/app/backend/data
-    environment:
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-    restart: unless-stopped
-
-volumes:
+volumes: 
   openwebui-data:
 ```
 
-#### 🔍 コンテナ定義の構文解説：
+<div style="page-break-after: always;"></div>
 
-| 項目               | 説明                                     |
-| ---------------- | -------------------------------------- |
-| `version`        | Composeファイルのバージョン（推奨：3.8）              |
-| `services`       | 実行するコンテナ群を定義するブロック                     |
-| `image`          | 使用するDockerイメージ（OpenWebUIの公式）           |
-| `container_name` | 任意のコンテナ名を指定（openwebui）                 |
-| `ports`          | ホストとコンテナのポートマッピング（例：3000）              |
-| `volumes`        | 永続化するデータボリュームの設定（チャット履歴など）             |
-| `environment`    | コンテナ内で使用される環境変数（OLLAMAのURL）            |
-| `restart`        | コンテナの再起動方針（unless-stopped: 停止しない限り再起動） |
 
-### 1-7. コンテナの起動
+# 🧠 第三段階：RAG構成によるWeb検索付き日本語チャットボットの構築
 
-以下のコマンドでOpenWebUIのDockerコンテナを起動：
+## ✅ モチベーション
+
+- LLM単体では情報が古かったり曖昧な回答をすることがある
+- 外部情報（Web検索結果など）を取り入れた RAG（Retrieval-Augmented Generation）により、信頼性・鮮度の高い回答を生成
+- 日本語対応の検索と回答に特化した構成を目指す
+
+---
+
+## ✅ 構成概要
+
+- **OpenWebUI**：ユーザーとの対話UI
+- **Ollama**：ローカルLLM（日本語モデル：`gemma:2b` など）
+- **SearxNG**：Web検索エンジン（オープンソースでGoogle/Bingなどをプロキシ検索可能）
+- **RAG構成**：
+  - ユーザーのクエリをもとに検索用クエリを生成
+  - Web検索で取得したドキュメントを埋め込み生成・検索
+  - 関連情報と一緒にLLMに回答生成を依頼
+
+---
+
+## ✅ docker-compose構成（OpenWebUI + SearxNG）
 
 ```bash
-docker compose up -d
-```
+version: '3.8' 
+services:
+  openwebui:
+    container_name: openwebui_host
+    image: ghcr.io/open-webui/open-webui:main
+    environment:
+      GLOBAL_LOG_LEVEL: "debug"
+      ENABLE_RAG_LOCAL_WEB_FETCH: True
+      ENABLE_RAG_WEB_SEARCH: True
+      RAG_EMBEDDING_ENGINE: "ollama"
+      RAG_EMBEDDING_MODEL: "kun432/cl-nagoya-ruri-base:latest"
+      RAG_EMBEDDING_BATCH_SIZE: 1
+      RAG_OLLAMA_BASE_URL: "http://host.docker.internal:11434"
+      CHUNK_SIZE: 500
+      CHUNK_OVERLAP: 50
+      RAG_WEB_SEARCH_ENGINE: "searxng"
+      RAG_WEB_SEARCH_RESULT_COUNT: 3
+      RAG_WEB_SEARCH_CONCURRENT_REQUESTS: 10
+      SEARXNG_QUERY_URL: "http://searxng:8080/search?lang=ja&q=<query>"
+      QUERY_GENERATION_PROMPT_TEMPLATE: |-
+        ### Task:
+        Analyze the chat history to determine the necessity of generating search queries, in the given language. By default, **prioritize generating 1-3 broad and relevant search queries** unless it is absolutely certain that no additional information is required. The aim is to retrieve comprehensive, updated, and valuable information even with minimal uncertainty. If no search is unequivocally needed, return an empty list.
 
-起動後、ブラウザで以下にアクセス：
+        ### Guidelines:
+        - クエリは必ず **日本語** にしてください
+        - Respond **EXCLUSIVELY** with a JSON object. Any form of extra commentary, explanation, or additional text is strictly prohibited.
+        - When generating search queries, respond in the format: { "queries": ["クエリ1", "クエリ2"] }, ensuring each query is distinct, concise, and relevant to the topic.
+        - If and only if it is entirely certain that no useful results can be retrieved by a search, return: { "queries": [] }.
+        - Err on the side of suggesting search queries if there is **any chance** they might provide useful or updated information.
+        - Be concise and focused on composing high-quality search queries, avoiding unnecessary elaboration, commentary, or assumptions.
+        - Today's date is: {{CURRENT_DATE}}.
+        - Always prioritize providing actionable and broad queries that maximize informational coverage.
 
-```
-http://localhost:3000
-```
+        ### Output:
+        Strictly return in JSON format: 
+        {
+          "queries": ["クエリ1", "クエリ2"]
+        }
 
-初回起動時はアカウント作成画面が表示されます。
+        ### Chat History:
+        <chat_history>
+        {{MESSAGES:END:6}}
+        </chat_history>
+    ports:
+      - "3000:8080"
+    volumes:
+      - open-webui:/app/backend/data
+
+  searxng:
+    container_name: searxng_host
+    image: searxng/searxng:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    env_file:
+      - .env
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "1"
+
+volumes:
+  open-webui:
+```
 
 ---
 
-## ✅ ステップ2：OpenWebUI上で日本語モデルの検証
+## ✅ OpenWebUIの設定手順（UI）
 
-### 2-1. OpenWebUIにアクセス
+1. ブラウザで `http://localhost:3000` にアクセス
+2. 「設定」→「ウェブ検索」タブへ
+3. `searxng` を選択
+4. `http://searxng:8080/search?lang=ja&q=<query>` を設定
+5. 保存
 
+---
+## ✅ SearXNGの設定変更
+searxng/settings.yml に SearXNG の設定ファイルが作成される。
+検索結果を JSON 形式で返せるように formats の値として json を追加。
+
+```bash
+  formats:
+    - html
+    - json #　←ココ追加
 ```
-http://localhost:3000
+変更を保存、コンテナを再起動
+```bash
+docker compose up
 ```
-
-ブラウザからアクセスし、初回はアカウントを作成する。
-
-### 2-2. モデルの切り替えと日本語動作確認
-
-* 「Model」設定から `llama3`, `nekomata`, `nous-hermes2` を選択
-* 日本語で以下のようなプロンプトを入力して検証：
-
-  * 「中京大学について教えてください」
-  * 「生成AIとは何ですか？」
-
-### 2-3. 応答品質の比較メモ
-
-| モデル          | 日本語精度      | 応答速度 | コメント        |
-| ------------ | ---------- | ---- | ----------- |
-| llama3       | △（一部英語混じり） | ◎    | 英語ベース、文脈は強い |
-| nekomata     | ◎          | ◯    | 日本語特化、安定動作  |
-| nous-hermes2 | ◯          | ◯    | 会話風に強いが一部冗長 |
+この状態で別ターミナルから以下のコマンドを実行すると、 JSON 形式の検索結果が取得できる
+```bash
+ curl "http://localhost:8080/search?lang=ja&q=ノーベル&format=json"
+```
 
 ---
 
-## 🚧 次ステップ（予定）
+## ✅ 動作確認例
 
-次は以下の機能を追加予定：
+- 質問例：「2024年のノーベル平和賞受賞者は誰？」
+- → RAG構成により検索 → 要約 → 回答が行われる
 
-* Web検索機能の組み込み（SerpAPI or LangChain）
-* 検索結果とLLMを組み合わせたRAG風応答の実装
-* 日本語における情報正確性の評価
-
-➡️ 続きは次回、ステップ3として追記予定
-"# OpenWebUI_test" 
-"# OpenWebUI_test" 
